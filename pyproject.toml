@@ -1,0 +1,11 @@
+[project]
+name = "model-comparison"
+version = "0.1.0"
+description = "Compare models on one CRM email-classification eval: same 100 emails, same request, same scoring."
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic[bedrock]",
+]
+
+[project.optional-dependencies]
+decider = ["strands-decider"]

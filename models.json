@@ -1,0 +1,7 @@
+{
+  "fake": {"provider": "fake"},
+  "claude-opus-5-5": {"provider": "bedrock", "model_id": "anthropic.claude-opus-5-5", "effort": "low"},
+  "claude-sonnet-5-5": {"provider": "bedrock", "model_id": "anthropic.claude-sonnet-5-5", "effort": "low"},
+  "strands-decider-2b": {"provider": "strands-decider", "model_id": "StrandsAgents/strands-decider-2B-hobson-v19"},
+  "jev": {"provider": "jev"}
+}
