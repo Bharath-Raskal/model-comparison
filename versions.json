@@ -1,0 +1,15 @@
+{
+  "prompt": {
+    "current": "v2",
+    "history": [
+      {"version": "v1", "since": "2026-10-06 13:00", "note": "First wording of the instructions and category descriptions."},
+      {"version": "v2", "since": "2026-10-06 15:03", "note": "Lead = wants to buy from us, vendor = wants to sell to us (promos and quotes included); not_crm is the explicit catch-all; never reply with a question."}
+    ]
+  },
+  "input": {
+    "current": "v1",
+    "history": [
+      {"version": "v1", "since": "2026-10-06 13:00", "note": "100 made-up CRM emails with the answer key: 30 leads, 20 support, 15 billing, 15 vendor, 20 not CRM."}
+    ]
+  }
+}

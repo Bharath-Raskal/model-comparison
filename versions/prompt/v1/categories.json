@@ -1,0 +1,22 @@
+[
+  {
+    "name": "new_lead",
+    "description": "Someone who is not yet a customer and could buy: asks about pricing, a demo, a trial, or whether the product fits their needs."
+  },
+  {
+    "name": "customer_support",
+    "description": "An existing customer needs help: something is broken, a how-to question, or a data, access or integration problem."
+  },
+  {
+    "name": "billing",
+    "description": "An existing customer writes about invoices, payments, refunds, card problems, plan changes or seat counts."
+  },
+  {
+    "name": "partner_vendor",
+    "description": "Someone selling to us or proposing to work with us: vendors, agencies, integration partners, resellers, recruiters."
+  },
+  {
+    "name": "not_crm",
+    "description": "Nothing for the CRM team: newsletters, spam, personal or internal chat, automated system notices."
+  }
+]

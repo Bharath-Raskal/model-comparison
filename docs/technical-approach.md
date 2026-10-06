@@ -32,14 +32,14 @@ Only the packaging differs, because each kind of model expects a different shape
 | Claude Opus, Sonnet | One written prompt: instructions plus categories, then the email. It replies with one category name. |
 | Jev, Strands Decider | Three fields: the email as `state`, the question as `instructions`, the categories as `criteria`. |
 
-The answer key (`data/labels.jsonl`) is never sent to any model.
+The answer key (`versions/input/<v>/labels.jsonl`) is never sent to any model.
 
 ## No examples, no training data
 
 No model gets sample emails or "seed data"; every model answers cold. This is called zero-shot.
 Jev and Decider do not need examples: their docs say to send the options with clear descriptions, which we do.
 
-- The category descriptions in `data/categories.json` are the only guidance, and every model sees the same text.
+- The category descriptions in `versions/prompt/<v>/categories.json` are the only guidance, and every model sees the same text.
 - If we ever add examples, they go into those descriptions so all four models get them equally.
 
 ## Why a model misses
@@ -72,4 +72,4 @@ a vendor promo read as spam, a vendor's "custom quote" read as a lead, and Sonne
 
 - The category descriptions now say who is buying: a lead wants to buy from us, a vendor wants to sell to us.
 - `not_crm` is now the explicit catch-all, and the prompt says never to reply with a question.
-- Every model gets the new wording, so all four were rerun; round-1 numbers are not comparable.
+- The old wording is kept as prompt v1 and the new one is prompt v2; results are stored per version so both can be compared side by side.

@@ -1,21 +1,22 @@
-"""Score every model in results/ against data/labels.jsonl and write results/REPORT.md.
+"""Score every model in one results folder against its input version's answer key and write REPORT.md.
 
-run.py calls this after every run, so the report always compares all models run so far.
+run.py calls this after every run, so each prompt/input combination's report stays current.
 """
 import json
 from datetime import datetime
 from pathlib import Path
 
 from request import load_categories, load_jsonl
+from versions import code_version, info, resolve, results_dir as version_results
 
 ROOT = Path(__file__).parent
 PRICE_NOTE = ("Prices come from models.json: Claude rows use Anthropic list prices (confirm against the "
               "Bedrock pricing page), Jev uses TypeSafe's published price, local models cost $0.")
 
 
-def spend_line(results_dir):
+def spend_line():
     cap = json.loads((ROOT / "guardrails.json").read_text(encoding="utf-8"))["max_usd_per_run"]
-    spend_file = results_dir / "spend.json"
+    spend_file = ROOT / "results" / "spend.json"
     spent = json.loads(spend_file.read_text(encoding="utf-8"))["total_usd"] if spend_file.exists() else 0.0
     return f"Paid runs so far: ${spent:.4f} in total; each run is capped at ${cap:.2f} (guardrails.json)."
 
@@ -25,7 +26,8 @@ def percentile(values, p):
     return ordered[min(len(ordered) - 1, int(round(p / 100 * (len(ordered) - 1))))] if ordered else 0
 
 
-def score_model(name, answers, truth, names, cfg):
+def score_model(name, answers, truth, names, cfg, meta=None):
+    meta = meta or {}
     per_cat = {}
     for cat in names:
         in_cat = [a for a in answers if truth[a["id"]] == cat]
@@ -47,27 +49,32 @@ def score_model(name, answers, truth, names, cfg):
         "cost_usd": cost,
         "cost_per_1k_emails": cost / len(answers) * 1000,
         "settings": f"effort {cfg['effort']}" if cfg.get("effort") else "-",
+        "model_id": cfg.get("model_id", "-"),
+        "run_at": meta.get("run_at", "-"),
         "answers": {a["id"]: a["label"] for a in answers},
     }
 
 
-def write_report(rows, names, n_emails, path):
+def write_report(rows, names, n_emails, path, prompt, input):
     def best(key, low=False):
         ranked = sorted(rows, key=lambda r: r[key], reverse=not low)
         return ranked[0]["model"] if ranked else "-"
 
+    pv, iv = info("prompt", prompt), info("input", input)
     summary = (f"{len(rows)} models on {n_emails} CRM emails: most accurate {best('accuracy')}, "
                f"fastest {best('avg_ms', low=True)}, cheapest {best('cost_per_1k_emails', low=True)}.")
     lines = [
-        "# Model comparison report", "", summary, "",
-        f"Generated {datetime.now():%Y-%m-%d %H:%M}. Accuracy = answers matching data/labels.jsonl.", "",
+        f"# Model comparison report: prompt {prompt}, input {input}", "", summary, "",
+        f"- Prompt {prompt} ({pv['since']}): {pv['note']}",
+        f"- Input {input} ({iv['since']}): {iv['note']}",
+        f"- Generated {datetime.now():%Y-%m-%d %H:%M} on code {code_version()['label']}.", "",
         "## Overall", "",
-        "| Model | Settings | Emails | Accuracy % | Avg ms | p95 ms | Tokens in | Tokens out | Run cost $ | $ per 1k emails |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| Model | Settings | Emails | Accuracy % | Avg ms | p95 ms | Tokens in | Tokens out | Run cost $ | $ per 1k emails | Last run |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in rows:
-        lines.append(f"| {r['model']} | {r['settings']} | {r['answered']} | {r['accuracy']} | {r['avg_ms']} | {r['p95_ms']} | {r['tokens_in']:,} | "
-                     f"{r['tokens_out']:,} | {r['cost_usd']:.4f} | {r['cost_per_1k_emails']:.4f} |")
+        lines.append(f"| {r['model']} | {r['settings']} | {r['answered']} | {r['accuracy']} | {r['avg_ms']} | {r['p95_ms']} | "
+                     f"{r['tokens_in']:,} | {r['tokens_out']:,} | {r['cost_usd']:.4f} | {r['cost_per_1k_emails']:.4f} | {r['run_at']} |")
     lines += ["", "## Accuracy by category (%)", "",
               "| Model | " + " | ".join(names) + " | Not a category |",
               "|---|" + "---|" * (len(names) + 1)]
@@ -78,14 +85,16 @@ def write_report(rows, names, n_emails, path):
               f"- A model with fewer than {n_emails} emails was a trial or was stopped early; its scores cover only the emails it answered.",
               "- \"Not a category\" counts refusals, truncations and errors; each is scored as a miss.",
               f"- {PRICE_NOTE}",
-              f"- {spend_line(path.parent)}", ""]
+              f"- {spend_line()}", ""]
     path.write_text("\n".join(lines), encoding="utf-8")
     return "\n".join(lines)
 
 
-def score(results_dir=ROOT / "results", quiet=False):
-    truth = {r["id"]: r["label"] for r in load_jsonl("labels.jsonl")}
-    names = [c["name"] for c in load_categories()]
+def score(prompt=None, input=None, results_dir=None, quiet=False):
+    versions = resolve(prompt, input)
+    results_dir = results_dir or version_results(**versions)
+    truth = {r["id"]: r["label"] for r in load_jsonl("labels.jsonl", versions["input"])}
+    names = [c["name"] for c in load_categories(versions["prompt"])]
     configs = json.loads((ROOT / "models.json").read_text(encoding="utf-8"))
     rows = []
     for resp_file in sorted(results_dir.glob("*/responses.jsonl")):
@@ -93,14 +102,20 @@ def score(results_dir=ROOT / "results", quiet=False):
         if answers:
             name = resp_file.parent.name
             run_file = resp_file.parent / "run.json"  # the settings this run actually used
-            cfg = json.loads(run_file.read_text(encoding="utf-8"))["config"] if run_file.exists() else configs.get(name, {})
-            rows.append(score_model(name, answers, truth, names, cfg))
+            meta = json.loads(run_file.read_text(encoding="utf-8")) if run_file.exists() else {}
+            rows.append(score_model(name, answers, truth, names, meta.get("config", configs.get(name, {})), meta))
     rows.sort(key=lambda r: -r["accuracy"])
-    report = write_report(rows, names, len(truth), results_dir / "REPORT.md")
+    results_dir.mkdir(parents=True, exist_ok=True)
+    report = write_report(rows, names, len(truth), results_dir / "REPORT.md", **versions)
     if not quiet:
         print(report)
     return rows
 
 
 if __name__ == "__main__":
-    score()
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument("--prompt")
+    p.add_argument("--input")
+    a = p.parse_args()
+    score(a.prompt, a.input)

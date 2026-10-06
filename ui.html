@@ -34,6 +34,17 @@ main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
 h1 { font-size: 22px; margin: 0 0 4px; }
 h2 { font-size: 15px; margin: 0 0 12px; }
 .sub { color: var(--ink-2); margin: 0 0 20px; }
+.code { font-size: 12px; color: var(--muted); margin: -14px 0 20px; }
+.code .dirty { color: var(--critical); }
+.versions { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 0 0 16px; }
+details.card summary { cursor: pointer; font-size: 15px; font-weight: 600; list-style: none; }
+details.card summary::before { content: "\25B8 "; color: var(--muted); }
+details.card[open] summary::before { content: "\25BE "; }
+details.card summary::-webkit-details-marker { display: none; }
+details.card[open] summary { margin-bottom: 12px; }
+.hist { margin: 0 0 12px; padding-left: 18px; color: var(--ink-2); }
+.hist li { margin: 3px 0; }
+.hist code { color: var(--ink); }
 .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
 .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
 label { display: grid; gap: 4px; font-size: 12px; color: var(--ink-2); }
@@ -70,14 +81,37 @@ dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margi
 dt { color: var(--ink-2); } dd { margin: 0; font-variant-numeric: tabular-nums; }
 #tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.15); display: none; z-index: 10; }
 .empty { color: var(--muted); padding: 12px 0; }
+.print-head { display: none; }
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  :root { color-scheme: light; --page: #fff; --surface: #fff; --ink: #000; --ink-2: #333; --muted: #555; --grid: #ccc; --axis: #999; --ring: #bbb; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: #fff; font-size: 11px; }
+  main { max-width: none; padding: 0; }
+  .print-head { display: block; color: #333; font-size: 11px; margin: 0 0 12px; }
+  .sub, .versions, #runCard, #tip, .hint, #onlyMisses, label[for], .legend { display: none !important; }
+  .card, details.card { border: 1px solid #ccc; break-inside: avoid; page-break-inside: avoid; margin-bottom: 10px; padding: 10px; }
+  details.card summary::before { content: ""; }
+  .scroll { overflow: visible; }
+  table { font-size: 10px; }
+  th, td { padding: 4px 6px; white-space: normal; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  .charts { grid-template-columns: repeat(3, 1fr); }
+  .subject { max-width: none; }
+}
 </style>
 </head>
 <body>
 <main>
   <h1>Model comparison</h1>
+  <p class="print-head" id="printHead"></p>
   <p class="sub" id="summary">Loading…</p>
+  <div class="versions">
+    <label>Prompt version <select id="promptV"></select></label>
+    <label>Input version <select id="inputV"></select></label>
+  </div>
 
-  <section class="card">
+  <section class="card" id="runCard">
     <h2>Run a model</h2>
     <div class="row">
       <label>Model <select id="model"></select></label>
@@ -85,6 +119,7 @@ dt { color: var(--ink-2); } dd { margin: 0; font-variant-numeric: tabular-nums; 
       <label id="effortWrap">Effort (Claude) <select id="effort"></select></label>
       <button class="primary" id="runBtn">Run</button>
       <button id="stopBtn" disabled title="Ends the run after the email in progress and scores the emails done so far">Stop</button>
+      <button id="printBtn" title="Opens the print dialog with every section expanded; choose Save as PDF there">Print report</button>
       <span class="hint" id="estimate"></span>
     </div>
     <div id="log"></div>
@@ -112,11 +147,29 @@ dt { color: var(--ink-2); } dd { margin: 0; font-variant-numeric: tabular-nums; 
     <div class="scroll"><table id="emails"></table></div>
   </section>
 
-  <section class="card">
-    <h2>Settings every model shares</h2>
+  <details class="card">
+    <summary>Categories</summary>
+    <p class="hint" style="margin:0 0 8px" id="catIntro"></p>
+    <dl id="catList"></dl>
+  </details>
+
+  <details class="card">
+    <summary>Settings every model shares</summary>
     <dl id="limits"></dl>
     <pre id="prompt"></pre>
-  </section>
+  </details>
+
+  <details class="card">
+    <summary>Version history</summary>
+    <h2 style="font-size:13px">Code running now</h2>
+    <p class="hist" id="codeNow" style="padding-left:0"></p>
+    <h2 style="font-size:13px">Code changes (git, newest first)</h2>
+    <ul class="hist" id="codeHist"></ul>
+    <h2 style="font-size:13px">Prompt versions</h2>
+    <ul class="hist" id="promptHist"></ul>
+    <h2 style="font-size:13px">Input versions</h2>
+    <ul class="hist" id="inputHist"></ul>
+  </details>
 </main>
 <div id="tip"></div>
 <script>
@@ -140,9 +193,12 @@ function color(name) {
 }
 const fmtUsd = (v) => "$" + (v < 0.01 ? v.toFixed(4) : v.toFixed(2));
 
+let chosen = {};  // prompt/input versions picked in the dropdowns; empty = current
 async function load() {
-  S = await (await fetch("/api/state")).json();
-  renderControls(); renderSummary(); renderCharts(); renderTables(); renderEmails(); renderSettings();
+  const q = new URLSearchParams(Object.entries(chosen).filter(([, v]) => v));
+  S = await (await fetch("/api/state?" + q)).json();
+  chosen = { ...S.selected };
+  renderVersions(); renderControls(); renderSummary(); renderCharts(); renderTables(); renderEmails(); renderSettings(); renderHistory();
   if (S.status.running) startPolling();
 }
 
@@ -171,8 +227,8 @@ function estimate() {
 async function runModel() {
   const m = current(); if (!m) return;
   const n = +$("limit").value;
-  if (m.live && !confirm(`Run ${m.name} on ${n} emails?\n\nThis calls a paid API. ${$("estimate").textContent}.`)) return;
-  const body = { model: m.name, limit: n, effort: m.provider === "bedrock" ? $("effort").value : null };
+  if (m.live && !confirm(`Run ${m.name} on ${n} emails with prompt ${chosen.prompt}, input ${chosen.input}?\n\nThis calls a paid API. ${$("estimate").textContent}.`)) return;
+  const body = { model: m.name, limit: n, effort: m.provider === "bedrock" ? $("effort").value : null, ...chosen };
   const res = await fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await res.json();
   if (!res.ok) { $("log").textContent = data.error; return; }
@@ -243,13 +299,14 @@ function tip(node, r) {
 }
 
 function renderTables() {
-  const head = ["Model", "Settings", "Emails", "Accuracy %", "Avg ms", "p95 ms", "Tokens in", "Tokens out", "Run cost", "$ per 1k emails"];
+  const head = ["Model", "Settings", "Emails", "Accuracy %", "Avg ms", "p95 ms", "Tokens in", "Tokens out", "Run cost", "$ per 1k emails", "Last run"];
   const numeric = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
   $("overall").replaceChildren(el("tr", {}, ...head.map((h, i) => el("th", { class: numeric.has(i) ? "num" : "" }, h))),
     ...(S.rows.length ? S.rows.map((r) => el("tr", {},
       el("td", {}, el("span", { class: "swatch", style: `--c:${color(r.model)}` }), r.model), el("td", {}, r.settings),
       ...[r.answered, r.accuracy, r.avg_ms.toLocaleString(), r.p95_ms.toLocaleString(), r.tokens_in.toLocaleString(),
-          r.tokens_out.toLocaleString(), fmtUsd(r.cost_usd), fmtUsd(r.cost_per_1k_emails)].map((v) => el("td", { class: "num" }, v))))
+          r.tokens_out.toLocaleString(), fmtUsd(r.cost_usd), fmtUsd(r.cost_per_1k_emails)].map((v) => el("td", { class: "num" }, v)),
+      el("td", { title: r.model_id }, r.run_at)))
       : [el("tr", {}, el("td", { colspan: head.length, class: "empty" }, "No runs yet."))]));
   $("bycat").replaceChildren(el("tr", {}, el("th", {}, "Model"), ...S.categories.map((c) => el("th", { class: "num" }, c)), el("th", { class: "num" }, "Not a category")),
     ...S.rows.map((r) => el("tr", {}, el("td", {}, el("span", { class: "swatch", style: `--c:${color(r.model)}` }), r.model),
@@ -281,6 +338,15 @@ function renderEmails() {
   $("emails").replaceChildren(...out);
 }
 
+// Print the whole report: every collapsed section open, the misses filter off, a header with the versions and date.
+function printReport() {
+  for (const d of document.querySelectorAll("details.card")) { d.dataset.wasOpen = d.open ? "1" : "0"; d.open = true; }
+  if ($("onlyMisses").checked) { $("onlyMisses").checked = false; renderEmails(); }
+  const now = new Date();
+  $("printHead").textContent = `Prompt ${S.selected.prompt} \u00b7 Input ${S.selected.input} \u00b7 ${S.emails.length} emails \u00b7 code ${S.code.commit}${S.code.dirty ? " + uncommitted changes" : ""} \u00b7 printed ${now.toLocaleString()}`;
+  setTimeout(() => window.print(), 50);
+}
+
 function renderSettings() {
   const g = S.guardrails;
   $("limits").replaceChildren(
@@ -288,14 +354,42 @@ function renderSettings() {
     el("dt", {}, "Tokens per run"), el("dd", {}, g.max_tokens_per_run.toLocaleString()),
     el("dt", {}, "Dollars per run"), el("dd", {}, "$" + g.max_usd_per_run.toFixed(2)),
     el("dt", {}, "Spent so far (all runs)"), el("dd", {}, fmtUsd(S.spend.total_usd)));
-  $("prompt").textContent = "Prompt every model gets (from data/prompt.txt):\n\n" + S.prompt;
+  $("prompt").textContent = `Prompt every model gets (prompt ${S.selected.prompt}):\n\n` + S.prompt;
+}
+
+function renderVersions() {
+  for (const [kind, sel] of [["prompt", $("promptV")], ["input", $("inputV")]]) {
+    const v = S.versions[kind];
+    sel.replaceChildren(...v.history.map((h) => el("option", { value: h.version, title: h.note },
+      h.version + (h.version === v.current ? " (current)" : ""))));
+    sel.value = S.selected[kind];
+  }
+}
+function changeVersion() {
+  chosen = { prompt: $("promptV").value, input: $("inputV").value };
+  load();
+}
+
+function renderHistory() {
+  $("codeNow").replaceChildren(el("code", {}, S.code.commit), ` \u00b7 ${S.code.at} \u00b7 ${S.code.message}`,
+    ...(S.code.dirty ? [" ", el("span", { class: "dirty" }, "\u00b7 plus uncommitted changes")] : []));
+  $("catIntro").textContent = `The five categories every model chooses from, as worded in prompt ${S.selected.prompt}.`;
+  $("catList").replaceChildren(...S.category_descriptions.flatMap((c) => [el("dt", {}, el("code", {}, c.name)), el("dd", {}, c.description)]));
+  const line = (h, cur) => el("li", {}, el("code", {}, h.version), h.version === cur ? " (current)" : "", ` \u00b7 ${h.since} \u00b7 ${h.note}`);
+  $("promptHist").replaceChildren(...S.versions.prompt.history.map((h) => line(h, S.versions.prompt.current)));
+  $("inputHist").replaceChildren(...S.versions.input.history.map((h) => line(h, S.versions.input.current)));
+  $("codeHist").replaceChildren(...S.code_history.map((c) => el("li", {}, el("code", {}, c.commit), ` \u00b7 ${c.at} \u00b7 ${c.message}`)));
 }
 
 $("model").addEventListener("change", syncEffort);
 $("limit").addEventListener("change", estimate);
 $("runBtn").addEventListener("click", runModel);
 $("stopBtn").addEventListener("click", stopRun);
+$("printBtn").addEventListener("click", printReport);
+window.addEventListener("afterprint", () => { for (const d of document.querySelectorAll("details.card")) d.open = d.dataset.wasOpen === "1"; });
 $("onlyMisses").addEventListener("change", renderEmails);
+$("promptV").addEventListener("change", changeVersion);
+$("inputV").addEventListener("change", changeVersion);
 load();
 </script>
 </body>

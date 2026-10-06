@@ -1,6 +1,6 @@
 {
   "claude-opus-5-5": {"provider": "bedrock", "model_id": "us.anthropic.claude-opus-5-5", "effort": "low", "usd_per_mtok_in": 4.0, "usd_per_mtok_out": 20.0},
   "claude-sonnet-5-5": {"provider": "bedrock", "model_id": "us.anthropic.claude-sonnet-5-5", "effort": "low", "usd_per_mtok_in": 2.0, "usd_per_mtok_out": 10.0},
-  "strands-decider-2b": {"provider": "strands-decider", "model_id": "StrandsAgents/strands-decider-2B-hobson-v19", "timeout_s": 180, "usd_per_mtok_in": 0, "usd_per_mtok_out": 0},
+  "strands-decider-2b": {"provider": "strands-decider", "model_id": "StrandsAgents/strands-decider-2B-hobson-v21", "timeout_s": 180, "usd_per_mtok_in": 0, "usd_per_mtok_out": 0},
   "jev": {"provider": "jev", "model_id": "jev-latest", "usd_per_mtok_in": 0.042, "usd_per_mtok_out": 0}
 }

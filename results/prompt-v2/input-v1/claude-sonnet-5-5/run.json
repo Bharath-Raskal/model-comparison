@@ -1,0 +1,20 @@
+{
+  "model": "claude-sonnet-5-5",
+  "config": {
+    "provider": "bedrock",
+    "model_id": "us.anthropic.claude-sonnet-5-5",
+    "effort": "low",
+    "usd_per_mtok_in": 2.0,
+    "usd_per_mtok_out": 10.0
+  },
+  "emails": 100,
+  "input_tokens": 41910,
+  "output_tokens": 714,
+  "cost_usd": 0.09096,
+  "seconds": 89.1,
+  "stopped": "",
+  "run_at": "2026-10-06 16:25",
+  "prompt_version": "v2",
+  "input_version": "v1",
+  "code": "ff941af \u00b7 2026-10-06 15:09 \u00b7 Enhance model comparison functionality: add timeout support for Strands Decider, improve error handling in run process, and implement a stop feature for ongoing runs. Update README for clarity and adjust category descriptions for better understanding. \u00b7 plus uncommitted changes"
+}

@@ -1,0 +1,21 @@
+{
+  "model": "strands-decider-2b",
+  "config": {
+    "provider": "strands-decider",
+    "model_id": "StrandsAgents/strands-decider-2B-hobson-v19",
+    "timeout_s": 180,
+    "usd_per_mtok_in": 0,
+    "usd_per_mtok_out": 0
+  },
+  "emails": 100,
+  "input_tokens": 24139,
+  "output_tokens": 100,
+  "cost_usd": 0.0,
+  "seconds": 917.3,
+  "stopped": "",
+  "run_at": "2026-10-06 15:12",
+  "prompt_version": "v1",
+  "input_version": "v1",
+  "code": "before versioning (commit 1e32692)",
+  "note": "run while the v2 wording was being drafted; kept under v1 by decision on 2026-10-06"
+}

@@ -12,5 +12,9 @@
   "output_tokens": 687,
   "cost_usd": 0.07629,
   "seconds": 87.1,
-  "stopped": ""
+  "stopped": "",
+  "run_at": "2026-10-06 14:34",
+  "prompt_version": "v1",
+  "input_version": "v1",
+  "code": "before versioning (commit 1e32692)"
 }

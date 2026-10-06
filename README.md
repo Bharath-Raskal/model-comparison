@@ -13,7 +13,7 @@ Compares four AI models on one task, sorting 100 CRM emails into 5 categories, o
 - **How it is scored:** an answer key holds the right category for every email, and models never see it.
   Each answer is marked right or wrong, then the report adds up accuracy, time per email and cost.
 - **How to use it:** open the local page, pick a model, press Run, and watch the comparison update.
-  Stop ends a run early and still scores the emails already answered.
+  Stop ends a run early and still scores the emails already answered; Print report saves the whole page as a PDF.
 - **Spend safety:** paid runs need a click-to-confirm, and every run stops at $5 or 150,000 tokens.
   Keys live in `.env`, which is never committed.
 
@@ -27,7 +27,7 @@ Files, request formats and formulas: [docs/technical-spec.md](docs/technical-spe
    The first start downloads the model from Hugging Face:
 
 ```
-uv run strands-decider serve StrandsAgents/strands-decider-2B-hobson-v19 --device cpu --port 8000
+uv run strands-decider serve StrandsAgents/strands-decider-2B-hobson-v21 --device cpu --port 8000
 ```
 
 ## Run
@@ -41,4 +41,11 @@ uv run python run.py claude-sonnet-5-5 --live
 uv run python score.py
 ```
 
-Answers land in `results/<model>/`, and every run refreshes `results/REPORT.md`.
+Answers land in `results/prompt-<v>/input-<v>/<model>/`, and every run refreshes that folder's `REPORT.md`.
+
+## Versions
+
+- Prompt versions (`versions/prompt/v1`, `v2`, ...) hold the instructions and category descriptions; input versions (`versions/input/v1`, ...) hold the emails and the answer key.
+- `versions.json` names the current one of each and keeps a one-line note per version. The page has a dropdown for each; `run.py` takes `--prompt` and `--input`.
+- To add one: copy the current folder to the next number, edit it, add its note, set it as current.
+- The code version shown on the page is the latest git commit, plus a flag when uncommitted changes are running.

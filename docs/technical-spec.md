@@ -6,18 +6,19 @@ What each file does, what goes over the wire to each model, and how every number
 
 | File | Job |
 |---|---|
-| `data/emails.jsonl`, `data/categories.json`, `data/prompt.txt` | The input: 100 emails, 5 categories, the shared instructions |
-| `data/labels.jsonl` | The answer key; read only by the scorer |
+| `versions.json` | The current prompt version and input version, with a one-line note per version |
+| `versions/prompt/<v>/` | `prompt.txt` and `categories.json`: the wording the models read |
+| `versions/input/<v>/` | `emails.jsonl` and `labels.jsonl` (the answer key; read only by the scorer) |
 | `request.py`, `models.py` | Build the one request per email; one adapter per provider |
-| `run.py`, `score.py` | Run one model and save answers; score all models into `results/REPORT.md` |
-| `ui.py`, `ui.html` | The local page at http://127.0.0.1:8765: run, stop, compare |
+| `run.py`, `score.py` | Run one model and save answers; score all models of one prompt/input combination into its `REPORT.md` |
+| `ui.py`, `ui.html` | The local page at http://127.0.0.1:8765: pick versions, run, stop, compare, print to PDF |
 
 ## Request per model
 
 Claude (Bedrock runtime, model `us.anthropic.claude-<name>`, effort set per run):
 
 ```
-system:   data/prompt.txt with the 5 categories filled in
+system:   versions/prompt/<v>/prompt.txt with the 5 categories filled in
 user:     From: <sender>  Subject: <subject>  <body>
 reply:    one category name, e.g. billing
 ```
@@ -33,8 +34,8 @@ reply:     choice, confidence, probabilities, token usage
 
 ## Saved answer (one line per email)
 
-`results/<model>/responses.jsonl` holds the email id, label, confidence, input tokens, output tokens, stop reason and latency.
-`results/<model>/run.json` holds the settings that run used, its totals and why it stopped, if it did.
+`results/prompt-<v>/input-<v>/<model>/responses.jsonl` holds the email id, label, confidence, input tokens, output tokens, stop reason and latency.
+`results/prompt-<v>/input-<v>/<model>/run.json` holds the settings that run used, its totals, the run time, the prompt and input versions, the git commit, and why it stopped, if it did.
 
 ## Report numbers
 

@@ -1,0 +1,20 @@
+{
+  "model": "strands-decider-2b",
+  "config": {
+    "provider": "strands-decider",
+    "model_id": "StrandsAgents/strands-decider-2B-hobson-v21",
+    "timeout_s": 180,
+    "usd_per_mtok_in": 0,
+    "usd_per_mtok_out": 0
+  },
+  "emails": 100,
+  "input_tokens": 27039,
+  "output_tokens": 100,
+  "cost_usd": 0.0,
+  "seconds": 943.6,
+  "stopped": "",
+  "run_at": "2026-10-06 16:44",
+  "prompt_version": "v2",
+  "input_version": "v1",
+  "code": "ff941af \u00b7 2026-10-06 15:09 \u00b7 Enhance model comparison functionality: add timeout support for Strands Decider, improve error handling in run process, and implement a stop feature for ongoing runs. Update README for clarity and adjust category descriptions for better understanding. \u00b7 plus uncommitted changes"
+}

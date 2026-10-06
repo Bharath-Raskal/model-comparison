@@ -8,8 +8,6 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-from request import load_categories
-
 _LIMITS = json.loads((Path(__file__).parent / "guardrails.json").read_text(encoding="utf-8"))
 MAX_OUTPUT_TOKENS = _LIMITS["max_output_tokens_per_email"]  # per-call ceiling; thinking counts toward it
 TIMEOUT_SECONDS = 60                                         # per-call timeout
@@ -84,13 +82,12 @@ class SystemOneModel:
         self.model = cfg["model_id"]
         self.key = None
         self.timeout = cfg.get("timeout_s", TIMEOUT_SECONDS)  # a local model on a laptop CPU needs longer
-        self.criteria = {c["name"]: c["description"] for c in load_categories()}
 
     def classify(self, req):
         body = {
             "state": req.user,
             "model": self.model,
-            "questions": {"category": {"type": "choice", "instructions": req.question, "criteria": self.criteria}},
+            "questions": {"category": {"type": "choice", "instructions": req.question, "criteria": req.criteria}},
         }
         headers = {"Content-Type": "application/json"}
         if self.key:
