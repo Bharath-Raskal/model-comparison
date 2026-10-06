@@ -84,6 +84,7 @@ dt { color: var(--ink-2); } dd { margin: 0; font-variant-numeric: tabular-nums; 
       <label>Emails <select id="limit"><option value="5">5 (trial)</option><option value="25">25</option><option value="100" selected>All 100</option></select></label>
       <label id="effortWrap">Effort (Claude) <select id="effort"></select></label>
       <button class="primary" id="runBtn">Run</button>
+      <button id="stopBtn" disabled title="Ends the run after the email in progress and scores the emails done so far">Stop</button>
       <span class="hint" id="estimate"></span>
     </div>
     <div id="log"></div>
@@ -179,13 +180,20 @@ async function runModel() {
 }
 function startPolling() {
   $("runBtn").disabled = true;
+  $("stopBtn").disabled = false;
   clearInterval(polling);
   polling = setInterval(async () => {
     const st = await (await fetch("/api/progress")).json();
     $("log").textContent = st.lines.join("\n");
     $("log").scrollTop = $("log").scrollHeight;
-    if (!st.running) { clearInterval(polling); $("runBtn").disabled = false; load(); }
+    if (st.stop_requested) $("stopBtn").disabled = true;
+    if (!st.running) { clearInterval(polling); $("runBtn").disabled = false; $("stopBtn").disabled = true; load(); }
   }, 800);
+}
+async function stopRun() {
+  $("stopBtn").disabled = true;
+  const res = await fetch("/api/stop", { method: "POST" });
+  if (!res.ok) $("log").textContent += "\n" + (await res.json()).error;
 }
 
 function best(key, low) {
@@ -248,6 +256,14 @@ function renderTables() {
       ...S.categories.map((c) => el("td", { class: "num" }, r.per_category[c] ?? "-")), el("td", { class: "num" }, r.not_a_category))));
 }
 
+// Short verdict in the cell; the model's actual reply is on hover.
+function verdictCell(a, expected) {
+  if (a === undefined) return el("td", { class: "hint" }, "not run");
+  if (a === expected) return el("td", { class: "ok", title: `Answered ${a}` }, "✓ right");
+  if (S.categories.includes(a)) return el("td", { class: "miss", title: `Answered ${a}, expected ${expected}` }, "✗ wrong");
+  return el("td", { class: "miss", title: `Not a category. Reply: ${a.replace(/^invalid:\s*/, "")}` }, "✗ invalid");
+}
+
 function renderEmails() {
   const rows = S.rows, only = $("onlyMisses").checked;
   const head = el("tr", {}, el("th", {}, "Email"), el("th", {}, "Subject"), el("th", {}, "Correct answer"), ...rows.map((r) => el("th", {}, r.model)));
@@ -256,8 +272,7 @@ function renderEmails() {
     const answers = rows.map((r) => r.answers[e.id]);
     if (only && !answers.some((a) => a !== undefined && a !== e.expected)) continue;
     const tr = el("tr", { class: "email" }, el("td", {}, e.id), el("td", { class: "subject", title: e.subject }, e.subject), el("td", {}, e.expected),
-      ...answers.map((a) => a === undefined ? el("td", { class: "hint" }, "not run")
-        : a === e.expected ? el("td", { class: "ok" }, "✓ right") : el("td", { class: "miss" }, "✗ " + a)));
+      ...answers.map((a) => verdictCell(a, e.expected)));
     const body = el("tr", { class: "body", style: "display:none" }, el("td", { colspan: 3 + rows.length }, `From ${e.from}: ${e.body}`));
     tr.addEventListener("click", () => { body.style.display = body.style.display === "none" ? "" : "none"; });
     out.push(tr, body);
@@ -279,6 +294,7 @@ function renderSettings() {
 $("model").addEventListener("change", syncEffort);
 $("limit").addEventListener("change", estimate);
 $("runBtn").addEventListener("click", runModel);
+$("stopBtn").addEventListener("click", stopRun);
 $("onlyMisses").addEventListener("change", renderEmails);
 load();
 </script>

@@ -1,0 +1,15 @@
+{
+  "model": "jev",
+  "config": {
+    "provider": "jev",
+    "model_id": "jev-latest",
+    "usd_per_mtok_in": 0.042,
+    "usd_per_mtok_out": 0
+  },
+  "emails": 100,
+  "input_tokens": 51173,
+  "output_tokens": 5937,
+  "cost_usd": 0.002149,
+  "seconds": 36.2,
+  "stopped": ""
+}

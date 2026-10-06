@@ -31,8 +31,11 @@ def load_spend(results_dir):
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"total_usd": 0.0, "runs": []}
 
 
-def run(name, limit=None, live=False, results_dir=ROOT / "results", overrides=None, log=print):
-    """overrides: per-run settings such as {"effort": "medium"}, saved with the run. log: progress sink."""
+def run(name, limit=None, live=False, results_dir=ROOT / "results", overrides=None, log=print,
+        should_stop=lambda: False):
+    """overrides: per-run settings such as {"effort": "medium"}, saved with the run. log: progress sink.
+    should_stop: checked before each email; when it returns True the run ends there, and the emails
+    answered so far are saved and scored as a partial run."""
     cfg = {**json.loads((ROOT / "models.json").read_text(encoding="utf-8"))[name], **(overrides or {})}
     if PROVIDERS[cfg["provider"]].live and not live:
         raise SystemExit(f"{name} calls a paid API. Re-run with --live once you have approved the spend.")
@@ -48,9 +51,17 @@ def run(name, limit=None, live=False, results_dir=ROOT / "results", overrides=No
     out_dir.mkdir(parents=True, exist_ok=True)
     total_in = total_out = 0
     stopped = ""
+    i = answered = 0
     started = time.time()
-    with open(out_dir / "responses.jsonl", "w", encoding="utf-8", newline="\n") as f:
-        for i, req in enumerate(requests, 1):
+    # Answers go to a new file first; the previous results stay in place until this run has real answers.
+    new_file = out_dir / "responses.new.jsonl"
+    with open(new_file, "w", encoding="utf-8", newline="\n") as f:
+        for n, req in enumerate(requests, 1):
+            if should_stop():
+                stopped = "stopped by you"
+                log(f"Stopped by you after {i} emails; scoring those only")
+                break
+            i = n
             t0 = time.time()
             try:
                 result = model.classify(req)
@@ -58,6 +69,8 @@ def run(name, limit=None, live=False, results_dir=ROOT / "results", overrides=No
                 result = Result("error", stop=f"{type(exc).__name__}: {exc}"[:200])
             row = {"id": req.email_id, **asdict(result), "latency_ms": round((time.time() - t0) * 1000)}
             f.write(json.dumps(row) + "\n")
+            f.flush()  # every answered email is on disk even if the run is cut short
+            answered += result.label != "error"
             total_in += result.input_tokens
             total_out += result.output_tokens
             log(f"[{i}/{len(requests)}] {req.email_id} -> {result.label}")
@@ -74,7 +87,13 @@ def run(name, limit=None, live=False, results_dir=ROOT / "results", overrides=No
         "model": name, "config": cfg, "emails": i, "input_tokens": total_in, "output_tokens": total_out,
         "cost_usd": round(usd, 6), "seconds": round(time.time() - started, 1), "stopped": stopped,
     }
-    (out_dir / "run.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    if answered:
+        new_file.replace(out_dir / "responses.jsonl")
+        (out_dir / "run.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    else:  # every email failed: keep the previous results, leave the failed run beside them to inspect
+        new_file.replace(out_dir / "responses.failed.jsonl")
+        (out_dir / "run.failed.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+        log(f"Every email failed, so the previous {name} results were kept. See {name}/responses.failed.jsonl")
     if usd > 0:
         spend["total_usd"] = round(spend["total_usd"] + usd, 6)
         spend["runs"].append({"model": name, "emails": i, "usd": round(usd, 6), "at": f"{datetime.now():%Y-%m-%d %H:%M}"})

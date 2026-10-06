@@ -1,7 +1,7 @@
 [
   {
     "name": "new_lead",
-    "description": "Someone who is not yet a customer and could buy: asks about pricing, a demo, a trial, or whether the product fits their needs."
+    "description": "Someone who is not yet a customer and wants to buy from us: asks about our pricing, a demo, a trial, or whether our product fits their needs."
   },
   {
     "name": "customer_support",
@@ -9,14 +9,14 @@
   },
   {
     "name": "billing",
-    "description": "An existing customer writes about invoices, payments, refunds, card problems, plan changes or seat counts."
+    "description": "An existing customer writes about their invoices, payments, refunds, card problems, plan changes or seat counts with us."
   },
   {
     "name": "partner_vendor",
-    "description": "Someone selling to us or proposing to work with us: vendors, agencies, integration partners, resellers, recruiters."
+    "description": "Someone who wants to sell to us or work with us: vendors and their promotions, agencies, integration partners, resellers, recruiters. An offer of a quote or discount to us belongs here."
   },
   {
     "name": "not_crm",
-    "description": "Nothing for the CRM team: newsletters, spam, personal or internal chat, automated system notices."
+    "description": "Anything that fits none of the four categories above: newsletters, spam and scams, personal or internal chat, automated system notices."
   }
 ]

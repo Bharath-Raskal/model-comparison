@@ -21,7 +21,7 @@ from score import score
 ROOT = Path(__file__).parent
 PORT = 8765
 EFFORTS = ("low", "medium", "high")
-status = {"running": False, "model": None, "lines": []}
+status = {"running": False, "model": None, "lines": [], "stop_requested": False}
 lock = threading.Lock()
 
 
@@ -74,7 +74,8 @@ def start_run(model, limit, effort):
 
     def work():
         try:
-            run(model, limit=limit, live=True, overrides={"effort": effort} if effort else None, log=log)
+            run(model, limit=limit, live=True, overrides={"effort": effort} if effort else None, log=log,
+                should_stop=lambda: status["stop_requested"])
         except SystemExit as stop:
             log(f"Stopped: {stop}")
         except Exception as exc:
@@ -82,7 +83,7 @@ def start_run(model, limit, effort):
         finally:
             status["running"] = False
 
-    status.update(running=True, model=model, lines=[])
+    status.update(running=True, model=model, lines=[], stop_requested=False)
     threading.Thread(target=work, daemon=True).start()
 
 
@@ -106,6 +107,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send(404, {"error": "not found"})
 
     def do_POST(self):
+        if self.path == "/api/stop":
+            if not status["running"]:
+                return self.send(409, {"error": "nothing is running"})
+            status["stop_requested"] = True
+            status["lines"].append("Stop requested: finishing the email in progress, then scoring what is done")
+            return self.send(202, {"stopping": status["model"]})
         if self.path != "/api/run":
             return self.send(404, {"error": "not found"})
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")

@@ -3,4 +3,5 @@ You sort incoming emails for a CRM sales team. Pick exactly one category for the
 Categories:
 {categories}
 
-Answer with only the category name, exactly as written above, and nothing else.
+Answer with exactly one category name from the list, written exactly as shown, and nothing else.
+If none of the first four fit, answer not_crm. Never reply with a question or an explanation.

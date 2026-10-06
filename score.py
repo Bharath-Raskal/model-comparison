@@ -75,7 +75,7 @@ def write_report(rows, names, n_emails, path):
         cats = " | ".join("-" if r["per_category"][c] is None else str(r["per_category"][c]) for c in names)
         lines.append(f"| {r['model']} | {cats} | {r['not_a_category']} |")
     lines += ["", "## Notes", "",
-              f"- A model with fewer than {n_emails} emails was a --limit trial run; compare it with care.",
+              f"- A model with fewer than {n_emails} emails was a trial or was stopped early; its scores cover only the emails it answered.",
               "- \"Not a category\" counts refusals, truncations and errors; each is scored as a miss.",
               f"- {PRICE_NOTE}",
               f"- {spend_line(path.parent)}", ""]

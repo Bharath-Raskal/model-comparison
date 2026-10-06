@@ -27,7 +27,7 @@ class Result:
 def parse_label(text, categories):
     """The reply must be exactly one category name (case, quotes and a trailing period forgiven)."""
     cleaned = text.strip().strip("`'\".").strip().lower()
-    return cleaned if cleaned in categories else f"invalid: {text.strip()[:40]}"
+    return cleaned if cleaned in categories else f"invalid: {text.strip()[:300]}"
 
 
 class BedrockClaude:
@@ -83,6 +83,7 @@ class SystemOneModel:
     def __init__(self, cfg):
         self.model = cfg["model_id"]
         self.key = None
+        self.timeout = cfg.get("timeout_s", TIMEOUT_SECONDS)  # a local model on a laptop CPU needs longer
         self.criteria = {c["name"]: c["description"] for c in load_categories()}
 
     def classify(self, req):
@@ -95,7 +96,7 @@ class SystemOneModel:
         if self.key:
             headers["Authorization"] = f"Bearer {self.key}"
         http_req = urllib.request.Request(self.url, data=json.dumps(body).encode("utf-8"), method="POST", headers=headers)
-        with urllib.request.urlopen(http_req, timeout=TIMEOUT_SECONDS) as resp:
+        with urllib.request.urlopen(http_req, timeout=self.timeout) as resp:
             data = json.load(resp)
         answer = data["answers"]["category"]
         usage = data.get("usage", {})

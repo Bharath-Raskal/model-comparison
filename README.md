@@ -1,28 +1,30 @@
 # model-comparison
 
-Compares models on one task: sorting 100 CRM emails into 5 categories. Every model gets the same request and the same scoring.
+Compares four AI models on one task, sorting 100 CRM emails into 5 categories, on accuracy, speed and cost.
 
-## What is here
+## In two minutes
 
-- `data/emails.jsonl`: 100 sample emails (made up, no real people).
-- `data/categories.json`: the 5 categories and what each means.
-- `data/labels.jsonl`: the correct category per email. Models never see this file.
-- `data/prompt.txt`: the instructions every model gets; `{categories}` is filled from `categories.json`.
-- `request.py` builds the one request per email, and `models.py` holds one small adapter per provider.
-- `run.py` saves answers to `results/<model>/`, then refreshes `results/REPORT.md`: accuracy, speed and cost for every model run so far.
+- **What it does:** each model reads the same 100 sample emails and picks a category for each one.
+  The categories are new lead, customer support, billing, partner or vendor, and not CRM.
+- **The models:** Claude Opus 5.5 and Sonnet 5.5 on AWS Bedrock, TypeSafe's Jev, and Strands Decider.
+  Decider runs on this laptop for free; the others are paid cloud APIs.
+- **Same input for all:** every model gets the email, one question and the 5 category descriptions.
+  No model gets examples or the answers; only the packaging differs per model.
+- **How it is scored:** an answer key holds the right category for every email, and models never see it.
+  Each answer is marked right or wrong, then the report adds up accuracy, time per email and cost.
+- **How to use it:** open the local page, pick a model, press Run, and watch the comparison update.
+  Stop ends a run early and still scores the emails already answered.
+- **Spend safety:** paid runs need a click-to-confirm, and every run stops at $5 or 150,000 tokens.
+  Keys live in `.env`, which is never committed.
 
-## Models
-
-- `claude-opus-5-5`, `claude-sonnet-5-5`: Claude on Amazon Bedrock, using your AWS login.
-- `strands-decider-2b`: open-source decision model that runs on this machine, free per call. It speaks the same API as Jev.
-- `jev`: TypeSafe's hosted decision model; needs `TYPESAFE_API_KEY` in `.env`.
+How it works, and why a model misses: [docs/technical-approach.md](docs/technical-approach.md).
+Files, request formats and formulas: [docs/technical-spec.md](docs/technical-spec.md).
 
 ## Setup
 
-Copy `.env.example` to `.env` and fill it in (it is git-ignored). Sign in to AWS with `aws sso login --profile <name>`.
-
-For Strands Decider, install it once with `uv sync --extra decider`, then keep its local server running in its own terminal
-(the first start downloads the model from Hugging Face):
+1. Copy `.env.example` to `.env` and fill it in. Sign in to AWS with `aws sso login --profile <name>`.
+2. For Strands Decider, install it once with `uv sync --extra decider`, then keep its server running in its own terminal.
+   The first start downloads the model from Hugging Face:
 
 ```
 uv run strands-decider serve StrandsAgents/strands-decider-2B-hobson-v19 --device cpu --port 8000
@@ -39,10 +41,4 @@ uv run python run.py claude-sonnet-5-5 --live
 uv run python score.py
 ```
 
-## Spend limits (`guardrails.json`)
-
-- Paid models refuse to run without `--live`.
-- Each email gets at most 512 output tokens and 60 seconds.
-- A run stops at 150,000 tokens or $5.00, whichever comes first.
-- Every paid run's cost is recorded in `results/spend.json` and shown in the report.
-- Emails over 8,000 characters are rejected, not cut.
+Answers land in `results/<model>/`, and every run refreshes `results/REPORT.md`.

@@ -1,0 +1,16 @@
+{
+  "model": "claude-sonnet-5-5",
+  "config": {
+    "provider": "bedrock",
+    "model_id": "us.anthropic.claude-sonnet-5-5",
+    "effort": "low",
+    "usd_per_mtok_in": 2.0,
+    "usd_per_mtok_out": 10.0
+  },
+  "emails": 100,
+  "input_tokens": 34710,
+  "output_tokens": 687,
+  "cost_usd": 0.07629,
+  "seconds": 87.1,
+  "stopped": ""
+}
