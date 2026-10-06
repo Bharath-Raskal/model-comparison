@@ -47,12 +47,13 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(rows[0]["model"], "fake")
             self.assertEqual(rows[0]["answered"], 100)
             self.assertTrue(0 < rows[0]["accuracy"] < 100)
-            self.assertTrue((Path(tmp) / "scores.md").exists())
+            report = (Path(tmp) / "REPORT.md").read_text(encoding="utf-8")
+            self.assertIn("1 models on 100 CRM emails: most accurate fake", report)
+            self.assertIn("| fake | 100 |", report)
 
     def test_paid_models_need_live_flag(self):
         with self.assertRaises(SystemExit):
             run("claude-sonnet-5-5", limit=1)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,4 @@
+You sort incoming emails for a CRM sales team. Pick exactly one category for the email.
+
+Categories:
+{categories}

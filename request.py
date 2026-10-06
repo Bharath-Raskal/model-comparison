@@ -29,10 +29,7 @@ def build_requests():
     categories = load_categories()
     names = tuple(c["name"] for c in categories)
     listing = "\n".join(f"- {c['name']}: {c['description']}" for c in categories)
-    system = (
-        "You sort incoming emails for a CRM sales team. Pick exactly one category for the email.\n\n"
-        f"Categories:\n{listing}"
-    )
+    system = (DATA / "prompt.txt").read_text(encoding="utf-8").strip().replace("{categories}", listing)
     requests = []
     for e in load_jsonl("emails.jsonl"):
         user = f"From: {e['from']}\nSubject: {e['subject']}\n\n{e['body']}"

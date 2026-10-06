@@ -7,11 +7,13 @@ import os
 import re
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 from request import answer_schema
 
-MAX_OUTPUT_TOKENS = 1024  # spend guard: per-call ceiling (adaptive thinking counts toward it)
-TIMEOUT_SECONDS = 60      # spend guard: per-call timeout
+_LIMITS = json.loads((Path(__file__).parent / "guardrails.json").read_text(encoding="utf-8"))
+MAX_OUTPUT_TOKENS = _LIMITS["max_output_tokens_per_email"]  # per-call ceiling; thinking counts toward it
+TIMEOUT_SECONDS = 60                                         # per-call timeout
 
 
 @dataclass
