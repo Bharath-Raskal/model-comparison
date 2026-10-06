@@ -57,7 +57,7 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(rows[0]["not_a_category"], 25)
             self.assertAlmostEqual(rows[0]["cost_usd"], 30000 / 1e6 * 2.0 + 500 / 1e6 * 10.0)
             report = (Path(tmp) / "REPORT.md").read_text(encoding="utf-8")
-            self.assertIn("| claude-sonnet-5-5 | 100 | 75.0 |", report)
+            self.assertIn("| claude-sonnet-5-5 | effort low | 100 | 75.0 |", report)
 
     def test_reply_parsing(self):
         cats = ("billing", "not_crm")

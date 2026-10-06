@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model Comparison</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  --good: #0ca30c; --good-ink: #006300; --critical: #d03b3b; --accent: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --good-ink: #0ca30c; --accent: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --good-ink: #0ca30c; --accent: #3987e5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 0 0 12px; }
+.sub { color: var(--ink-2); margin: 0 0 20px; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+label { display: grid; gap: 4px; font-size: 12px; color: var(--ink-2); }
+select, button { font: inherit; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink); }
+button.primary { background: var(--accent); color: #fff; border-color: transparent; font-weight: 600; cursor: pointer; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.hint { color: var(--ink-2); font-size: 12px; }
+#log { margin-top: 12px; max-height: 180px; overflow: auto; font: 12px/1.5 ui-monospace, Consolas, monospace; color: var(--ink-2); white-space: pre-wrap; }
+#log:empty { display: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; color: var(--ink-2); font-size: 13px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--c); margin-right: 6px; vertical-align: -1px; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.chart h3 { font-size: 13px; margin: 0 0 2px; }
+.chart .note { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+.bar-row { display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 8px; margin: 6px 0; }
+.bar-row .name { font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.track { position: relative; height: 22px; border-left: 1px solid var(--axis); }
+.bar { position: absolute; left: 0; top: 3px; height: 16px; border-radius: 0 4px 4px 0; background: var(--c); min-width: 2px; }
+.bar-val { position: absolute; top: 2px; font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { color: var(--ink-2); font-weight: 600; font-size: 12px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--c); margin-right: 6px; }
+.ok { color: var(--good-ink); }
+.miss { color: var(--critical); }
+tr.email { cursor: pointer; }
+tr.email:hover td { background: var(--grid); }
+tr.body td { white-space: normal; color: var(--ink-2); background: var(--page); }
+.subject { max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
+pre { white-space: pre-wrap; margin: 0; font: 12px/1.5 ui-monospace, Consolas, monospace; color: var(--ink-2); }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0 0 12px; }
+dt { color: var(--ink-2); } dd { margin: 0; font-variant-numeric: tabular-nums; }
+#tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.15); display: none; z-index: 10; }
+.empty { color: var(--muted); padding: 12px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Model comparison</h1>
+  <p class="sub" id="summary">Loading…</p>
+
+  <section class="card">
+    <h2>Run a model</h2>
+    <div class="row">
+      <label>Model <select id="model"></select></label>
+      <label>Emails <select id="limit"><option value="5">5 (trial)</option><option value="25">25</option><option value="100" selected>All 100</option></select></label>
+      <label id="effortWrap">Effort (Claude) <select id="effort"></select></label>
+      <button class="primary" id="runBtn">Run</button>
+      <span class="hint" id="estimate"></span>
+    </div>
+    <div id="log"></div>
+  </section>
+
+  <section class="card">
+    <h2>Comparison</h2>
+    <div class="legend" id="legend"></div>
+    <div class="charts" id="charts"></div>
+  </section>
+
+  <section class="card">
+    <h2>All numbers</h2>
+    <div class="scroll"><table id="overall"></table></div>
+    <h2 style="margin-top:20px">Accuracy by category (%)</h2>
+    <div class="scroll"><table id="bycat"></table></div>
+  </section>
+
+  <section class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <h2 style="margin:0">Every email</h2>
+      <label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="onlyMisses"> Only emails a model got wrong</label>
+    </div>
+    <p class="hint" style="margin:0 0 8px">Click an email to read it.</p>
+    <div class="scroll"><table id="emails"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Settings every model shares</h2>
+    <dl id="limits"></dl>
+    <pre id="prompt"></pre>
+  </section>
+</main>
+<div id="tip"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+let S = null, polling = null;
+const SLOTS = 8;
+
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "style") n.style.cssText = v; else if (k === "class") n.className = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+  }
+  for (const k of kids) n.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  return n;
+}
+// Colour follows the model's position in models.json, never its rank in a chart.
+function color(name) {
+  const i = S.models.findIndex((m) => m.name === name);
+  return `var(--s${(i % SLOTS) + 1})`;
+}
+const fmtUsd = (v) => "$" + (v < 0.01 ? v.toFixed(4) : v.toFixed(2));
+
+async function load() {
+  S = await (await fetch("/api/state")).json();
+  renderControls(); renderSummary(); renderCharts(); renderTables(); renderEmails(); renderSettings();
+  if (S.status.running) startPolling();
+}
+
+function renderControls() {
+  const sel = $("model"), keep = sel.value;
+  sel.replaceChildren(...S.models.map((m) => el("option", { value: m.name, ...(m.not_ready ? { disabled: "" } : {}) },
+    m.not_ready ? `${m.name} (${m.not_ready})` : m.name)));
+  sel.value = keep && S.models.some((m) => m.name === keep && !m.not_ready) ? keep : (S.models.find((m) => !m.not_ready) || {}).name;
+  $("effort").replaceChildren(...S.efforts.map((e) => el("option", { value: e }, e)));
+  syncEffort();
+}
+function current() { return S.models.find((m) => m.name === $("model").value); }
+function syncEffort() {
+  const m = current(); const isClaude = m && m.provider === "bedrock";
+  $("effortWrap").style.display = isClaude ? "" : "none";
+  if (isClaude && m.effort) $("effort").value = m.effort;
+  estimate();
+}
+function estimate() {
+  const m = current(); if (!m) return;
+  const n = +$("limit").value, out = S.guardrails.max_output_tokens_per_email;
+  const worst = (n * 600 * m.usd_in + n * out * m.usd_out) / 1e6;
+  $("estimate").textContent = m.live ? `Worst case ${fmtUsd(worst)} · run stops at $${S.guardrails.max_usd_per_run.toFixed(2)}` : "Runs on this machine · no cost";
+}
+
+async function runModel() {
+  const m = current(); if (!m) return;
+  const n = +$("limit").value;
+  if (m.live && !confirm(`Run ${m.name} on ${n} emails?\n\nThis calls a paid API. ${$("estimate").textContent}.`)) return;
+  const body = { model: m.name, limit: n, effort: m.provider === "bedrock" ? $("effort").value : null };
+  const res = await fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) { $("log").textContent = data.error; return; }
+  startPolling();
+}
+function startPolling() {
+  $("runBtn").disabled = true;
+  clearInterval(polling);
+  polling = setInterval(async () => {
+    const st = await (await fetch("/api/progress")).json();
+    $("log").textContent = st.lines.join("\n");
+    $("log").scrollTop = $("log").scrollHeight;
+    if (!st.running) { clearInterval(polling); $("runBtn").disabled = false; load(); }
+  }, 800);
+}
+
+function best(key, low) {
+  if (!S.rows.length) return "-";
+  return [...S.rows].sort((a, b) => low ? a[key] - b[key] : b[key] - a[key])[0].model;
+}
+function renderSummary() {
+  $("summary").textContent = S.rows.length
+    ? `${S.rows.length} model run(s) on ${S.emails.length} CRM emails: most accurate ${best("accuracy")}, fastest ${best("avg_ms", true)}, cheapest ${best("cost_per_1k_emails", true)}.`
+    : "No runs yet. Pick a model above and press Run.";
+}
+
+function renderCharts() {
+  const rows = [...S.rows].sort((a, b) => S.models.findIndex((m) => m.name === a.model) - S.models.findIndex((m) => m.name === b.model));
+  $("legend").replaceChildren(...rows.map((r) => el("span", { style: `--c:${color(r.model)}` }, r.model)));
+  const specs = [
+    { key: "accuracy", title: "Accuracy", note: "% of emails matching the answer key · higher is better", max: 100, fmt: (v) => v + "%" },
+    { key: "avg_ms", title: "Speed", note: "average ms per email · lower is better", fmt: (v) => v.toLocaleString() + " ms" },
+    { key: "cost_per_1k_emails", title: "Cost", note: "$ per 1,000 emails · lower is better", fmt: fmtUsd },
+  ];
+  if (!rows.length) { $("charts").replaceChildren(el("p", { class: "empty" }, "Charts appear after the first run.")); return; }
+  $("charts").replaceChildren(...specs.map((sp) => {
+    const max = sp.max || Math.max(...rows.map((r) => r[sp.key])) || 1;
+    return el("div", { class: "chart" }, el("h3", {}, sp.title), el("p", { class: "note" }, sp.note),
+      ...rows.map((r) => {
+        const pct = Math.max(0, r[sp.key]) / max * 100;
+        const bar = el("div", { class: "bar", style: `width:${pct * 0.78}%;--c:${color(r.model)}` });
+        const val = el("span", { class: "bar-val", style: `left:calc(${pct * 0.78}% + 6px)` }, sp.fmt(r[sp.key]));
+        const track = el("div", { class: "track" }, bar, val);
+        tip(track, r);
+        return el("div", { class: "bar-row" }, el("span", { class: "name", title: r.model }, r.model), track);
+      }));
+  }));
+}
+function tip(node, r) {
+  node.addEventListener("mousemove", (e) => {
+    const t = $("tip");
+    t.replaceChildren(el("strong", {}, r.model), el("br"),
+      `${r.settings} · ${r.answered} emails`, el("br"),
+      `Accuracy ${r.accuracy}% · avg ${r.avg_ms} ms · p95 ${r.p95_ms} ms`, el("br"),
+      `${r.tokens_in.toLocaleString()} tokens in · ${r.tokens_out.toLocaleString()} out · run cost ${fmtUsd(r.cost_usd)}`);
+    t.style.display = "block";
+    t.style.left = Math.min(e.clientX + 14, innerWidth - t.offsetWidth - 8) + "px";
+    t.style.top = (e.clientY + 14) + "px";
+  });
+  node.addEventListener("mouseleave", () => { $("tip").style.display = "none"; });
+}
+
+function renderTables() {
+  const head = ["Model", "Settings", "Emails", "Accuracy %", "Avg ms", "p95 ms", "Tokens in", "Tokens out", "Run cost", "$ per 1k emails"];
+  const numeric = new Set([2, 3, 4, 5, 6, 7, 8, 9]);
+  $("overall").replaceChildren(el("tr", {}, ...head.map((h, i) => el("th", { class: numeric.has(i) ? "num" : "" }, h))),
+    ...(S.rows.length ? S.rows.map((r) => el("tr", {},
+      el("td", {}, el("span", { class: "swatch", style: `--c:${color(r.model)}` }), r.model), el("td", {}, r.settings),
+      ...[r.answered, r.accuracy, r.avg_ms.toLocaleString(), r.p95_ms.toLocaleString(), r.tokens_in.toLocaleString(),
+          r.tokens_out.toLocaleString(), fmtUsd(r.cost_usd), fmtUsd(r.cost_per_1k_emails)].map((v) => el("td", { class: "num" }, v))))
+      : [el("tr", {}, el("td", { colspan: head.length, class: "empty" }, "No runs yet."))]));
+  $("bycat").replaceChildren(el("tr", {}, el("th", {}, "Model"), ...S.categories.map((c) => el("th", { class: "num" }, c)), el("th", { class: "num" }, "Not a category")),
+    ...S.rows.map((r) => el("tr", {}, el("td", {}, el("span", { class: "swatch", style: `--c:${color(r.model)}` }), r.model),
+      ...S.categories.map((c) => el("td", { class: "num" }, r.per_category[c] ?? "-")), el("td", { class: "num" }, r.not_a_category))));
+}
+
+function renderEmails() {
+  const rows = S.rows, only = $("onlyMisses").checked;
+  const head = el("tr", {}, el("th", {}, "Email"), el("th", {}, "Subject"), el("th", {}, "Correct answer"), ...rows.map((r) => el("th", {}, r.model)));
+  const out = [head];
+  for (const e of S.emails) {
+    const answers = rows.map((r) => r.answers[e.id]);
+    if (only && !answers.some((a) => a !== undefined && a !== e.expected)) continue;
+    const tr = el("tr", { class: "email" }, el("td", {}, e.id), el("td", { class: "subject", title: e.subject }, e.subject), el("td", {}, e.expected),
+      ...answers.map((a) => a === undefined ? el("td", { class: "hint" }, "not run")
+        : a === e.expected ? el("td", { class: "ok" }, "✓ right") : el("td", { class: "miss" }, "✗ " + a)));
+    const body = el("tr", { class: "body", style: "display:none" }, el("td", { colspan: 3 + rows.length }, `From ${e.from}: ${e.body}`));
+    tr.addEventListener("click", () => { body.style.display = body.style.display === "none" ? "" : "none"; });
+    out.push(tr, body);
+  }
+  if (out.length === 1) out.push(el("tr", {}, el("td", { colspan: 3 + rows.length, class: "empty" }, "Nothing to show.")));
+  $("emails").replaceChildren(...out);
+}
+
+function renderSettings() {
+  const g = S.guardrails;
+  $("limits").replaceChildren(
+    el("dt", {}, "Output tokens per email"), el("dd", {}, g.max_output_tokens_per_email),
+    el("dt", {}, "Tokens per run"), el("dd", {}, g.max_tokens_per_run.toLocaleString()),
+    el("dt", {}, "Dollars per run"), el("dd", {}, "$" + g.max_usd_per_run.toFixed(2)),
+    el("dt", {}, "Spent so far (all runs)"), el("dd", {}, fmtUsd(S.spend.total_usd)));
+  $("prompt").textContent = "Prompt every model gets (from data/prompt.txt):\n\n" + S.prompt;
+}
+
+$("model").addEventListener("change", syncEffort);
+$("limit").addEventListener("change", estimate);
+$("runBtn").addEventListener("click", runModel);
+$("onlyMisses").addEventListener("change", renderEmails);
+load();
+</script>
+</body>
+</html>

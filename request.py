@@ -35,6 +35,6 @@ def build_requests():
         user = f"From: {e['from']}\nSubject: {e['subject']}\n\n{e['body']}"
         if len(user) > MAX_EMAIL_CHARS:
             raise ValueError(f"{e['id']} is {len(user)} chars, over the {MAX_EMAIL_CHARS} cap")
-        requests.append(Request(e["id"], system, user, names, "Which category fits this email best?"))
+        requests.append(Request(e["id"], system, user, names, "Which category does this email to a CRM sales team belong in?"))
     return requests
 

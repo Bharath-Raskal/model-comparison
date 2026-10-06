@@ -46,6 +46,8 @@ def score_model(name, answers, truth, names, cfg):
         "tokens_out": tokens_out,
         "cost_usd": cost,
         "cost_per_1k_emails": cost / len(answers) * 1000,
+        "settings": f"effort {cfg['effort']}" if cfg.get("effort") else "-",
+        "answers": {a["id"]: a["label"] for a in answers},
     }
 
 
@@ -60,11 +62,11 @@ def write_report(rows, names, n_emails, path):
         "# Model comparison report", "", summary, "",
         f"Generated {datetime.now():%Y-%m-%d %H:%M}. Accuracy = answers matching data/labels.jsonl.", "",
         "## Overall", "",
-        "| Model | Emails | Accuracy % | Avg ms | p95 ms | Tokens in | Tokens out | Run cost $ | $ per 1k emails |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| Model | Settings | Emails | Accuracy % | Avg ms | p95 ms | Tokens in | Tokens out | Run cost $ | $ per 1k emails |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in rows:
-        lines.append(f"| {r['model']} | {r['answered']} | {r['accuracy']} | {r['avg_ms']} | {r['p95_ms']} | {r['tokens_in']:,} | "
+        lines.append(f"| {r['model']} | {r['settings']} | {r['answered']} | {r['accuracy']} | {r['avg_ms']} | {r['p95_ms']} | {r['tokens_in']:,} | "
                      f"{r['tokens_out']:,} | {r['cost_usd']:.4f} | {r['cost_per_1k_emails']:.4f} |")
     lines += ["", "## Accuracy by category (%)", "",
               "| Model | " + " | ".join(names) + " | Not a category |",
@@ -81,7 +83,7 @@ def write_report(rows, names, n_emails, path):
     return "\n".join(lines)
 
 
-def score(results_dir=ROOT / "results"):
+def score(results_dir=ROOT / "results", quiet=False):
     truth = {r["id"]: r["label"] for r in load_jsonl("labels.jsonl")}
     names = [c["name"] for c in load_categories()]
     configs = json.loads((ROOT / "models.json").read_text(encoding="utf-8"))
@@ -90,9 +92,13 @@ def score(results_dir=ROOT / "results"):
         answers = [json.loads(l) for l in resp_file.read_text(encoding="utf-8").splitlines() if l.strip()]
         if answers:
             name = resp_file.parent.name
-            rows.append(score_model(name, answers, truth, names, configs.get(name, {})))
+            run_file = resp_file.parent / "run.json"  # the settings this run actually used
+            cfg = json.loads(run_file.read_text(encoding="utf-8"))["config"] if run_file.exists() else configs.get(name, {})
+            rows.append(score_model(name, answers, truth, names, cfg))
     rows.sort(key=lambda r: -r["accuracy"])
-    print(write_report(rows, names, len(truth), results_dir / "REPORT.md"))
+    report = write_report(rows, names, len(truth), results_dir / "REPORT.md")
+    if not quiet:
+        print(report)
     return rows
 
 

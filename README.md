@@ -14,10 +14,23 @@ Compares models on one task: sorting 100 CRM emails into 5 categories. Every mod
 ## Models
 
 - `claude-opus-5-5`, `claude-sonnet-5-5`: Claude on Amazon Bedrock, using your AWS login.
-- `strands-decider-2b`: open-source decision model that runs on this machine (`pip install strands-decider`).
-- `jev`: TypeSafe's hosted decision model; needs `TYPESAFE_API_KEY`, adapter pending their API docs.
+- `strands-decider-2b`: open-source decision model that runs on this machine, free per call. It speaks the same API as Jev.
+- `jev`: TypeSafe's hosted decision model; needs `TYPESAFE_API_KEY` in `.env`.
+
+## Setup
+
+Copy `.env.example` to `.env` and fill it in (it is git-ignored). Sign in to AWS with `aws sso login --profile <name>`.
+
+For Strands Decider, install it once with `uv sync --extra decider`, then keep its local server running in its own terminal
+(the first start downloads the model from Hugging Face):
+
+```
+uv run strands-decider serve StrandsAgents/strands-decider-2B-hobson-v19 --device cpu --port 8000
+```
 
 ## Run
+
+The page: `uv run python ui.py`, then open http://127.0.0.1:8765. Or from the command line:
 
 ```
 python -m unittest discover tests

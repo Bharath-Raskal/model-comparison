@@ -4,10 +4,11 @@ Adding a provider = one class with classify(req) and one entry in models.json.
 """
 import json
 import os
-import re
-import subprocess
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+
+from request import load_categories
 
 _LIMITS = json.loads((Path(__file__).parent / "guardrails.json").read_text(encoding="utf-8"))
 MAX_OUTPUT_TOKENS = _LIMITS["max_output_tokens_per_email"]  # per-call ceiling; thinking counts toward it
@@ -68,47 +69,59 @@ class BedrockClaude:
         return Result(parse_label(text, req.categories), stop=resp.stop_reason, **usage)
 
 
-class StrandsDecider:
-    """Strands Decider 2B, an open-source decision model that runs on this machine.
+class SystemOneModel:
+    """A decision model behind TypeSafe's System One API (POST /v1/systemone).
 
-    Calls the strands-decider CLI (pip install strands-decider). It picks one of the options and
-    reports a confidence. Runs locally, so there is no token bill.
-    """
-
-    live = False
-    CHOICE_LINE = re.compile(r"choice_0\s*->\s*(\S+)\s*\(confidence\s*([\d.]+)\)")
-
-    def __init__(self, cfg):
-        self.model = cfg["model_id"]
-
-    def classify(self, req):
-        state = f"{req.system}\n\nEmail:\n{req.user}"
-        choice = f"{req.question}={','.join(req.categories)}"
-        out = subprocess.run(
-            ["strands-decider", "ask", self.model, "--state", state, "--choice", choice],
-            capture_output=True, text=True, encoding="utf-8", timeout=TIMEOUT_SECONDS,
-        )
-        match = self.CHOICE_LINE.search(out.stdout)
-        if out.returncode != 0 or not match:
-            return Result("error", stop=(out.stderr or out.stdout)[-200:])
-        return Result(match.group(1), confidence=float(match.group(2)), stop="decided")
-
-
-class Jev:
-    """TypeSafe Jev, a hosted decision model. Key from TYPESAFE_API_KEY.
-
-    Not wired yet: the request shape needs TypeSafe's API docs, which come with the early-access key.
+    Gets the same information as the LLMs, each part in its own slot (docs.typesafe.ai/primitives/choice):
+    the email is the state, the question is the instructions, and the categories with their
+    descriptions are the Choice criteria. Stateless per call; no setup on the provider side.
     """
 
     live = True
+    url = ""
 
     def __init__(self, cfg):
-        if not os.environ.get("TYPESAFE_API_KEY"):
-            raise RuntimeError("Set TYPESAFE_API_KEY first")
-        raise NotImplementedError("Jev adapter pending TypeSafe API docs")
+        self.model = cfg["model_id"]
+        self.key = None
+        self.criteria = {c["name"]: c["description"] for c in load_categories()}
 
     def classify(self, req):
-        raise NotImplementedError
+        body = {
+            "state": req.user,
+            "model": self.model,
+            "questions": {"category": {"type": "choice", "instructions": req.question, "criteria": self.criteria}},
+        }
+        headers = {"Content-Type": "application/json"}
+        if self.key:
+            headers["Authorization"] = f"Bearer {self.key}"
+        http_req = urllib.request.Request(self.url, data=json.dumps(body).encode("utf-8"), method="POST", headers=headers)
+        with urllib.request.urlopen(http_req, timeout=TIMEOUT_SECONDS) as resp:
+            data = json.load(resp)
+        answer = data["answers"]["category"]
+        usage = data.get("usage", {})
+        return Result(answer["choice"], confidence=answer.get("confidence"),
+                      input_tokens=usage.get("input_tokens", 0), output_tokens=usage.get("output_tokens", 0),
+                      stop=data.get("model", ""))
+
+
+class Jev(SystemOneModel):
+    """TypeSafe Jev, hosted. Key from TYPESAFE_API_KEY (.env)."""
+
+    url = "https://api.typesafe.ai/v1/systemone"
+
+    def __init__(self, cfg):
+        super().__init__(cfg)
+        self.key = os.environ.get("TYPESAFE_API_KEY")
+        if not self.key:
+            raise RuntimeError("Set TYPESAFE_API_KEY in .env first")
+
+
+class StrandsDecider(SystemOneModel):
+    """Strands Decider 2B, open source, served on this machine by `strands-decider serve`, which
+    speaks the same System One API as Jev. Free per call; start the server first (README)."""
+
+    live = False
+    url = os.environ.get("DECIDER_URL", "http://127.0.0.1:8000/v1/systemone")
 
 
 PROVIDERS = {"bedrock": BedrockClaude, "strands-decider": StrandsDecider, "jev": Jev}

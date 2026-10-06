@@ -13,6 +13,7 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
+import env  # noqa: F401  loads .env before any AWS or API client starts
 from models import PROVIDERS, Result, make_model
 from request import build_requests
 from score import score
@@ -30,8 +31,9 @@ def load_spend(results_dir):
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"total_usd": 0.0, "runs": []}
 
 
-def run(name, limit=None, live=False, results_dir=ROOT / "results"):
-    cfg = json.loads((ROOT / "models.json").read_text(encoding="utf-8"))[name]
+def run(name, limit=None, live=False, results_dir=ROOT / "results", overrides=None, log=print):
+    """overrides: per-run settings such as {"effort": "medium"}, saved with the run. log: progress sink."""
+    cfg = {**json.loads((ROOT / "models.json").read_text(encoding="utf-8"))[name], **(overrides or {})}
     if PROVIDERS[cfg["provider"]].live and not live:
         raise SystemExit(f"{name} calls a paid API. Re-run with --live once you have approved the spend.")
     spend = load_spend(results_dir)
@@ -40,7 +42,7 @@ def run(name, limit=None, live=False, results_dir=ROOT / "results"):
 
     requests = build_requests()[:limit]
     worst = cost_usd(cfg, len(requests) * 600, len(requests) * LIMITS["max_output_tokens_per_email"])
-    print(f"{name}: {len(requests)} emails, worst case ${worst:.2f}, this run stops at ${budget:.2f}")
+    log(f"{name}: {len(requests)} emails, worst case ${worst:.2f}, this run stops at ${budget:.2f}")
 
     out_dir = results_dir / name
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -58,13 +60,13 @@ def run(name, limit=None, live=False, results_dir=ROOT / "results"):
             f.write(json.dumps(row) + "\n")
             total_in += result.input_tokens
             total_out += result.output_tokens
-            print(f"[{i}/{len(requests)}] {req.email_id} -> {result.label}")
+            log(f"[{i}/{len(requests)}] {req.email_id} -> {result.label}")
             if total_in + total_out >= LIMITS["max_tokens_per_run"]:
                 stopped = f"token cap {LIMITS['max_tokens_per_run']:,}"
             elif cost_usd(cfg, total_in, total_out) >= budget:
                 stopped = f"dollar cap ${budget:.2f}"
             if stopped:
-                print(f"Stopped after {i} emails: hit the {stopped}")
+                log(f"Stopped after {i} emails: hit the {stopped}")
                 break
 
     usd = cost_usd(cfg, total_in, total_out)
@@ -77,7 +79,7 @@ def run(name, limit=None, live=False, results_dir=ROOT / "results"):
         spend["total_usd"] = round(spend["total_usd"] + usd, 6)
         spend["runs"].append({"model": name, "emails": i, "usd": round(usd, 6), "at": f"{datetime.now():%Y-%m-%d %H:%M}"})
         (results_dir / "spend.json").write_text(json.dumps(spend, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(summary))
+    log(f"Done: {i} emails, {total_in:,} tokens in, {total_out:,} out, ${usd:.4f}")
     score(results_dir)  # refresh results/REPORT.md with every model run so far
     return summary
 
