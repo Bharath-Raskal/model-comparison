@@ -9,8 +9,6 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from request import answer_schema
-
 _LIMITS = json.loads((Path(__file__).parent / "guardrails.json").read_text(encoding="utf-8"))
 MAX_OUTPUT_TOKENS = _LIMITS["max_output_tokens_per_email"]  # per-call ceiling; thinking counts toward it
 TIMEOUT_SECONDS = 60                                         # per-call timeout
@@ -25,54 +23,39 @@ class Result:
     stop: str = ""
 
 
-class FakeModel:
-    """Keyword rules, no network. Used by the tests and to try the pipeline for free."""
-
-    live = False
-    RULES = [
-        ("billing", r"invoice|refund|charge|billing|receipt|downgrade|cancel|seats|renewal|vat|currency"),
-        ("customer_support", r"error|can't|cannot|not working|stopped|crash|how do i|fix|failed|missing"),
-        ("partner_vendor", r"partner|agency|resell|recruit|our api|sponsor|portfolio|catalog|proposal"),
-        ("new_lead", r"pricing|demo|trial|quote|plan|interested|evaluat"),
-    ]
-
-    def __init__(self, cfg):
-        pass
-
-    def classify(self, req):
-        text = req.user.lower()
-        for label, pattern in self.RULES:
-            if re.search(pattern, text):
-                return Result(label, stop="rule")
-        return Result("not_crm", stop="default")
+def parse_label(text, categories):
+    """The reply must be exactly one category name (case, quotes and a trailing period forgiven)."""
+    cleaned = text.strip().strip("`'\".").strip().lower()
+    return cleaned if cleaned in categories else f"invalid: {text.strip()[:40]}"
 
 
 class BedrockClaude:
-    """Claude on Amazon Bedrock through the Anthropic SDK's Mantle client.
+    """Claude on Amazon Bedrock through the Anthropic SDK's Bedrock client.
 
+    Uses the classic bedrock-runtime endpoint with a cross-region inference profile id
+    (us.anthropic...): the newer Mantle endpoint returned "model does not exist" in this account.
     Auth comes from the normal AWS chain (AWS_PROFILE / SSO), region from cfg or AWS_REGION.
     """
 
     live = True
 
     def __init__(self, cfg):
-        from anthropic import AnthropicBedrockMantle  # imported here so tests need no SDK
+        from anthropic import AnthropicBedrock  # imported here so tests need no SDK
 
         self.model = cfg["model_id"]
         self.effort = cfg.get("effort", "low")
-        region = cfg.get("region") or os.environ.get("AWS_REGION", "us-east-1")
-        self.client = AnthropicBedrockMantle(aws_region=region, timeout=TIMEOUT_SECONDS, max_retries=2)
+        region = cfg.get("region") or os.environ.get("AWS_REGION", "us-west-2")
+        self.client = AnthropicBedrock(aws_region=region, timeout=TIMEOUT_SECONDS, max_retries=2)
 
     def classify(self, req):
+        # Classic Bedrock rejects output_config.format, so the prompt asks for the bare category
+        # name and anything else is scored as "not a category".
         resp = self.client.messages.create(
             model=self.model,
             max_tokens=MAX_OUTPUT_TOKENS,
             system=req.system,
             messages=[{"role": "user", "content": req.user}],
-            output_config={
-                "effort": self.effort,
-                "format": {"type": "json_schema", "schema": answer_schema(req.categories)},
-            },
+            output_config={"effort": self.effort},
         )
         usage = dict(input_tokens=resp.usage.input_tokens, output_tokens=resp.usage.output_tokens)
         # No refusal fallback on purpose: a fallback would answer with a different model and
@@ -81,8 +64,8 @@ class BedrockClaude:
             return Result("refused", stop="refusal", **usage)
         if resp.stop_reason == "max_tokens":
             return Result("truncated", stop="max_tokens", **usage)
-        text = next(b.text for b in resp.content if b.type == "text")
-        return Result(json.loads(text)["category"], stop=resp.stop_reason, **usage)
+        text = "".join(b.text for b in resp.content if b.type == "text")
+        return Result(parse_label(text, req.categories), stop=resp.stop_reason, **usage)
 
 
 class StrandsDecider:
@@ -128,7 +111,7 @@ class Jev:
         raise NotImplementedError
 
 
-PROVIDERS = {"fake": FakeModel, "bedrock": BedrockClaude, "strands-decider": StrandsDecider, "jev": Jev}
+PROVIDERS = {"bedrock": BedrockClaude, "strands-decider": StrandsDecider, "jev": Jev}
 
 
 def make_model(cfg):

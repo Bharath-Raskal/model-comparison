@@ -38,12 +38,3 @@ def build_requests():
         requests.append(Request(e["id"], system, user, names, "Which category fits this email best?"))
     return requests
 
-
-def answer_schema(categories):
-    """JSON schema that only allows one of the category names."""
-    return {
-        "type": "object",
-        "properties": {"category": {"type": "string", "enum": list(categories)}},
-        "required": ["category"],
-        "additionalProperties": False,
-    }

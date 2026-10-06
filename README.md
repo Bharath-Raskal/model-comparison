@@ -16,15 +16,14 @@ Compares models on one task: sorting 100 CRM emails into 5 categories. Every mod
 - `claude-opus-5-5`, `claude-sonnet-5-5`: Claude on Amazon Bedrock, using your AWS login.
 - `strands-decider-2b`: open-source decision model that runs on this machine (`pip install strands-decider`).
 - `jev`: TypeSafe's hosted decision model; needs `TYPESAFE_API_KEY`, adapter pending their API docs.
-- `fake`: keyword rules, free, for testing the pipeline.
 
 ## Run
 
 ```
 python -m unittest discover tests
-python run.py fake
-python run.py claude-sonnet-5-5 --limit 5 --live
-python score.py
+uv run python run.py claude-sonnet-5-5 --limit 5 --live
+uv run python run.py claude-sonnet-5-5 --live
+uv run python score.py
 ```
 
 ## Spend limits (`guardrails.json`)

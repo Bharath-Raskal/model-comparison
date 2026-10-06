@@ -1,7 +1,7 @@
 """Run one model over the emails and save its answers to results/<model>/.
 
-    python run.py fake                       # free, no network
-    python run.py claude-sonnet-5-5 --limit 5 --live
+    python run.py claude-sonnet-5-5 --limit 5 --live   # 5-email trial
+    python run.py claude-sonnet-5-5 --live             # all 100
 
 Spend limits live in guardrails.json. A run stops as soon as it passes the per-run token or dollar
 cap. Every paid run is recorded in results/spend.json.

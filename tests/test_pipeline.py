@@ -1,7 +1,8 @@
-"""Checks the data and the full run -> score loop with the free fake model.
+"""Checks the data, the reply parsing and the scoring, without calling any model.
 
     python -m unittest discover tests
 """
+import json
 import sys
 import tempfile
 import unittest
@@ -10,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from models import parse_label  # noqa: E402
 from request import build_requests, load_categories, load_jsonl  # noqa: E402
 from run import run  # noqa: E402
 from score import score  # noqa: E402
@@ -39,17 +41,28 @@ class DataTests(unittest.TestCase):
 
 
 class PipelineTests(unittest.TestCase):
-    def test_fake_run_then_score(self):
+    def test_score_marks_saved_answers_against_the_key(self):
+        truth = {l["id"]: l["label"] for l in load_jsonl("labels.jsonl")}
         with tempfile.TemporaryDirectory() as tmp:
-            summary = run("fake", results_dir=Path(tmp))
-            self.assertEqual(summary["emails"], 100)
+            out = Path(tmp) / "claude-sonnet-5-5"
+            out.mkdir()
+            lines = []
+            for i, (eid, label) in enumerate(truth.items()):  # first 75 right, last 25 wrong
+                answer = label if i < 75 else "not_a_real_category"
+                lines.append(json.dumps({"id": eid, "label": answer, "confidence": None, "input_tokens": 300,
+                                         "output_tokens": 5, "stop": "end_turn", "latency_ms": 800}))
+            (out / "responses.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
             rows = score(results_dir=Path(tmp))
-            self.assertEqual(rows[0]["model"], "fake")
-            self.assertEqual(rows[0]["answered"], 100)
-            self.assertTrue(0 < rows[0]["accuracy"] < 100)
+            self.assertEqual(rows[0]["accuracy"], 75.0)
+            self.assertEqual(rows[0]["not_a_category"], 25)
+            self.assertAlmostEqual(rows[0]["cost_usd"], 30000 / 1e6 * 2.0 + 500 / 1e6 * 10.0)
             report = (Path(tmp) / "REPORT.md").read_text(encoding="utf-8")
-            self.assertIn("1 models on 100 CRM emails: most accurate fake", report)
-            self.assertIn("| fake | 100 |", report)
+            self.assertIn("| claude-sonnet-5-5 | 100 | 75.0 |", report)
+
+    def test_reply_parsing(self):
+        cats = ("billing", "not_crm")
+        self.assertEqual(parse_label(" Billing.\n", cats), "billing")
+        self.assertTrue(parse_label("I think billing", cats).startswith("invalid"))
 
     def test_paid_models_need_live_flag(self):
         with self.assertRaises(SystemExit):
