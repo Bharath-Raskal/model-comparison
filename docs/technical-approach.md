@@ -63,7 +63,7 @@ Decider is a small 2-billion-parameter model on a laptop processor, so it is exp
 - No fallback to another model when one refuses: a stand-in model would blur the comparison.
 - Claude goes through the Bedrock runtime with `us.` model names, because the newer endpoint did not know these models in our account.
 - Decider runs as a local server that speaks Jev's API, so both decision models get identical requests apart from the model name.
-- The answer key was written by Claude (Opus 5.5), so it may lean towards Claude; a human spot-check is still open.
+- The emails and the answer key were generated with Claude Fable 5.1, a separate model from the four compared; every label behind a miss was re-checked.
 
 ## Prompt round 2 (2026-10-06)
 
